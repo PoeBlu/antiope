@@ -20,9 +20,9 @@ INSTANCE_RESOURCE_PATH = "ssm/managedinstance"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -37,29 +37,36 @@ def lambda_handler(event, context):
             process_instances(target_account, client, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
 def process_instances(target_account, client, region):
 
     instances = get_all_instances(client)
-    logger.info("Found {} managed instances for {} in {}".format(len(instances), target_account.account_id, region))
+    logger.info(
+        f"Found {len(instances)} managed instances for {target_account.account_id} in {region}"
+    )
 
     # dump info about instances to S3 as json
     for instance in instances:
-        resource_item = {}
-        resource_item['awsAccountId']                   = target_account.account_id
-        resource_item['awsAccountName']                 = target_account.account_name
-        resource_item['resourceType']                   = "AWS::SSM::ManagedInstanceInventory"
-        resource_item['source']                         = "Antiope"
-        resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+        resource_item = {
+            'awsAccountId': target_account.account_id,
+            'awsAccountName': target_account.account_name,
+            'resourceType': "AWS::SSM::ManagedInstanceInventory",
+            'source': "Antiope",
+            'configurationItemCaptureTime': str(datetime.datetime.now()),
+        }
         resource_item['awsRegion']                      = region
         resource_item['configuration']                  = instance
         resource_item['supplementaryConfiguration']     = {}

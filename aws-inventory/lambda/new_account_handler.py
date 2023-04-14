@@ -20,7 +20,7 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     for record in event['Records']:
         if record['eventSource'] != "aws:dynamodb":
@@ -38,7 +38,7 @@ def lambda_handler(event, context):
 
 
 def send_message(record, topic):
-    print("Sending Message: {}".format(record))
+    print(f"Sending Message: {record}")
     sns_client = boto3.client('sns')
     try:
         sns_client.publish(
@@ -47,14 +47,11 @@ def send_message(record, topic):
             Message=json.dumps(record, sort_keys=True, default=str),
         )
     except ClientError as e:
-        logger.error('Error publishing message: {}'.format(e))
+        logger.error(f'Error publishing message: {e}')
 
 
 def deseralize(ddb_record):
     # This is probablt a semi-dangerous hack.
     # https://github.com/boto/boto3/blob/e353ecc219497438b955781988ce7f5cf7efae25/boto3/dynamodb/types.py#L233
     ds = TypeDeserializer()
-    output = {}
-    for k, v in ddb_record.items():
-        output[k] = ds.deserialize(v)
-    return(output)
+    return {k: ds.deserialize(v) for k, v in ddb_record.items()}

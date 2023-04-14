@@ -21,9 +21,9 @@ RESOURCE_PATH = "ec2/eni"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -31,13 +31,17 @@ def lambda_handler(event, context):
             discover_enis(target_account, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -49,13 +53,13 @@ def discover_enis(account, region):
     '''
     s3client = boto3.client('s3')
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = account.account_id
-    resource_item['awsAccountName']                 = account.account_name
-    resource_item['resourceType']                   = "AWS::EC2::NetworkInterface"
-    resource_item['source']                         = "Antiope"
-    resource_item['awsRegion']                      = region
-
+    resource_item = {
+        'awsAccountId': account.account_id,
+        'awsAccountName': account.account_name,
+        'resourceType': "AWS::EC2::NetworkInterface",
+        'source': "Antiope",
+        'awsRegion': region,
+    }
     interfaces = []
 
     # Not all Public IPs are attached to instances. So we use ec2 describe_network_interfaces()
@@ -81,7 +85,7 @@ def discover_enis(account, region):
         # Now build up the Public IP Objects
         if 'Association' in eni and 'PublicIp' in eni['Association']:
             try:
-                object_key = "PublicIPs/{}.json".format(eni['Association']['PublicIp'])
+                object_key = f"PublicIPs/{eni['Association']['PublicIp']}.json"
                 s3client.put_object(
                     Body=json.dumps(eni, sort_keys=True, default=str, indent=2),
                     Bucket=os.environ['INVENTORY_BUCKET'],
@@ -89,7 +93,7 @@ def discover_enis(account, region):
                     Key=object_key,
                 )
             except ClientError as e:
-                logger.error("Unable to save object {}: {}".format(object_key, e))
+                logger.error(f"Unable to save object {object_key}: {e}")
 
 
 def json_serial(obj):
@@ -97,4 +101,4 @@ def json_serial(obj):
 
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
-    raise TypeError("Type %s not serializable" % type(obj))
+    raise TypeError(f"Type {type(obj)} not serializable")

@@ -26,7 +26,7 @@ def write_list_to_db(tag, obj_list):
     
 # Lambda main routine
 def handler(event, context):
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     credential_info = get_azure_creds(os.environ['AZURE_SECRET_NAME'])
     if credential_info is None:
@@ -35,9 +35,9 @@ def handler(event, context):
     project_list = get_subcriptions(credential_info)
     if project_list is None:
         raise Exception("No Projects found. Aborting...")
-    
+
     data_getters = [(get_vms, "vm"), (get_logic_apps, "Logic-Apps"), (get_key_vaults, "Key-Vaults"), (get_data_factories, "Data-Factories"), (get_sql_servers, "SQL-Servers"), (get_disks, "Disks")]
-    
+
     for project in project_list:
         for func in data_getters:
             try:

@@ -27,7 +27,7 @@ def handler(event, context):
     if 'DEBUG' in os.environ and os.environ['DEBUG'] == "True":
         logger.setLevel(logging.DEBUG)
 
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     client = boto3.client('sns')
 
@@ -40,12 +40,7 @@ def handler(event, context):
         message['account_id'] = account_id  # Which account to process
 
         # Sleep between 0 and 9 seconds before sending the message.
-        if 'nowait' in event and event['nowait'] is True:
-            response = client.publish(
-                TopicArn=os.environ['TRIGGER_ACCOUNT_INVENTORY_ARN'],
-                Message=json.dumps(message)
-            )
-        else:
+        if 'nowait' not in event or event['nowait'] is not True:
             # if we've still got more than hurry_up time left, do the delay.
             logger.debug(f"{time.time()} - {start_time} < {hurry_up}")
             if time.time() - start_time < hurry_up:
@@ -53,11 +48,10 @@ def handler(event, context):
                 logger.debug(f"Delaying {delay} sec for account {account_id}")
                 time.sleep(delay)
             logger.debug(f"Publishing for {account_id}")
-            response = client.publish(
-                TopicArn=os.environ['TRIGGER_ACCOUNT_INVENTORY_ARN'],
-                Message=json.dumps(message)
-            )
-
+        response = client.publish(
+            TopicArn=os.environ['TRIGGER_ACCOUNT_INVENTORY_ARN'],
+            Message=json.dumps(message)
+        )
     return(event)
 
 # end handler()

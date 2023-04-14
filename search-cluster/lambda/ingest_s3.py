@@ -21,14 +21,14 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 def lambda_handler(event, context):
     if 'DEBUG' in os.environ and os.environ['DEBUG'] == "True":
         logger.setLevel(logging.DEBUG)
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     region = os.environ['AWS_REGION']
     service = 'es'
     credentials = boto3.Session().get_credentials()
     awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
 
-    host = "https://{}".format(os.environ['ES_DOMAIN_ENDPOINT'])
+    host = f"https://{os.environ['ES_DOMAIN_ENDPOINT']}"
     es_type = "_doc"  # This is what es is moving to after deprecating types in 6.0
     headers = {"Content-Type": "application/json"}
 
@@ -99,15 +99,15 @@ def lambda_handler(event, context):
                 if 'index' not in item:
                     logger.error(f"Item {item} was not of type index. Huh?")
                     continue
-                if item['index']['status'] != 201 and item['index']['status'] != 200:
+                if item['index']['status'] not in [201, 200]:
                     logger.error(f"Bulk Ingest Failure: Index {item['index']['_index']} ID {item['index']['_id']} Status {item['index']['status']} - {item}")
                     requeue_keys.append(process_requeue(item))
 
     except Exception as e:
-        logger.critical("General Exception Indexing s3://{}/{}: {}".format(bucket, obj_key, e))
+        logger.critical(f"General Exception Indexing s3://{bucket}/{obj_key}: {e}")
         raise
 
-    if len(requeue_keys) > 0:
+    if requeue_keys:
         requeue_objects(os.environ['INVENTORY_BUCKET'], requeue_keys)
 
 
@@ -149,10 +149,7 @@ def fix_principal(json_doc):
     # Do the replace
     modified_json_string = json_string.replace(string_to_match, string_to_sub)
 
-    # Convert back to dict
-    modified_json_doc = json.loads(modified_json_string)
-
-    return(modified_json_doc)
+    return json.loads(modified_json_string)
 
 
 def requeue_objects(bucket, objects):
@@ -184,7 +181,7 @@ def get_object(bucket, obj_key):
         return(json.loads(response['Body'].read()))
     except ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchKey':
-            logger.error("Unable to find resource s3://{}/{}".format(bucket, obj_key))
+            logger.error(f"Unable to find resource s3://{bucket}/{obj_key}")
         else:
-            logger.error("Error getting resource s3://{}/{}: {}".format(bucket, obj_key, e))
+            logger.error(f"Error getting resource s3://{bucket}/{obj_key}: {e}")
         return(None)

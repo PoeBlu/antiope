@@ -53,15 +53,12 @@ def main(args, logger):
         try:
             os.makedirs(args.output_dir)
         except OSError:
-            print ("Creation of the directory %s failed" % args.output_dir)
+            print(f"Creation of the directory {args.output_dir} failed")
         else:
-            print ("Successfully created the directory %s" % args.output_dir)
+            print(f"Successfully created the directory {args.output_dir}")
 
     # print(es.indices)
-    if not args.index:
-        search_index = "*"
-    else:
-        search_index = args.index
+    search_index = args.index if args.index else "*"
     for index_name in es.indices.get(search_index):
         if not index_name.startswith("resources_"):
             continue
@@ -82,12 +79,11 @@ def main(args, logger):
         if 'tags' in mapping['mappings']['_doc']['properties']:
             del(mapping['mappings']['_doc']['properties']['tags'])
 
-        print("Dumping %s" % index_name)
+        print(f"Dumping {index_name}")
         if args.output_dir is not None:
             file_name = f"{args.output_dir}/{index_name}.json"
-            file = open(file_name, "w")
-            file.write(json.dumps(mapping, sort_keys=True, indent=2))
-            file.close()
+            with open(file_name, "w") as file:
+                file.write(json.dumps(mapping, sort_keys=True, indent=2))
         else:
             print(json.dumps(mapping, sort_keys=True, indent=2))
 
@@ -98,11 +94,10 @@ def get_endpoint(domain):
     es_client = boto3.client('es')
 
     response = es_client.describe_elasticsearch_domain(DomainName=domain)
-    if 'DomainStatus' in response:
-        if 'Endpoint' in response['DomainStatus']:
-            return(response['DomainStatus']['Endpoint'])
+    if 'DomainStatus' in response and 'Endpoint' in response['DomainStatus']:
+        return(response['DomainStatus']['Endpoint'])
 
-    logger.error("Unable to get ES Endpoint for {}".format(domain))
+    logger.error(f"Unable to get ES Endpoint for {domain}")
     return(None)
 
 
@@ -122,9 +117,7 @@ def do_args():
     parser.add_argument("--output_dir", help="Directory to dump all mappings into", default=None)
     parser.add_argument("--list", help="Only list all the indices", action='store_true')
 
-    args = parser.parse_args()
-
-    return(args)
+    return parser.parse_args()
 
 if __name__ == '__main__':
 

@@ -29,7 +29,7 @@ table_format = ["display_name", "subscription_id", "cost", "state" ]
 
 # Lambda main routine
 def handler(event, context):
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     dynamodb = boto3.resource('dynamodb')
     account_table = dynamodb.Table(os.environ['SUBSCRIPTION_TABLE'])
@@ -49,7 +49,7 @@ def handler(event, context):
         j = {}
         table_data += "<tr>"
         for col_name in table_format:
-            table_data += "<td>{}</td>".format(getattr(subscription, col_name))
+            table_data += f"<td>{getattr(subscription, col_name)}</td>"
             j[col_name] = getattr(subscription, col_name)
         table_data += "</tr>\n"
         json_data.append(j)
@@ -64,14 +64,14 @@ def handler(event, context):
         )
         html_body = str(response['Body'].read().decode("utf-8") )
     except ClientError as e:
-        logger.error("ClientError getting HTML Template: {}".format(e))
+        logger.error(f"ClientError getting HTML Template: {e}")
         raise
 
     # This assumes only three {} in the template
     try:
         file = html_body.format(os.environ['INVENTORY_BUCKET'], len(subscription_list), table_data, datetime.datetime.now())
     except Exception as e:
-        logger.error("Error generating HTML Report. Template correct? : {}".format(e))
+        logger.error(f"Error generating HTML Report. Template correct? : {e}")
         raise
 
 
@@ -93,7 +93,7 @@ def handler(event, context):
             Key='Reports/azure_subscription_inventory.json',
         )
     except ClientError as e:
-        logger.error("ClientError saving report: {}".format(e))
+        logger.error(f"ClientError saving report: {e}")
         raise
 
     return(event)

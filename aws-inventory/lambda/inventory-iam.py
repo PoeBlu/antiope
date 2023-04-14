@@ -25,9 +25,9 @@ SAML_RESOURCE_PATH = "iam/saml"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -36,13 +36,17 @@ def lambda_handler(event, context):
         discover_saml_provider(target_account)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -59,12 +63,12 @@ def discover_roles(account):
         response = iam_client.list_roles(Marker=response['Marker'])  # I love how the AWS API is so inconsistent with how they do pagination.
     roles += response['Roles']
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = account.account_id
-    resource_item['awsAccountName']                 = account.account_name
-    resource_item['resourceType']                   = "AWS::IAM::Role"
-    resource_item['source']                         = "Antiope"
-
+    resource_item = {
+        'awsAccountId': account.account_id,
+        'awsAccountName': account.account_name,
+        'resourceType': "AWS::IAM::Role",
+        'source': "Antiope",
+    }
     for role in roles:
         resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
         resource_item['configuration']                  = role
@@ -81,8 +85,12 @@ def discover_roles(account):
         # Now here is the interesting bit. What other accounts does this role trust, and do we know them?
         for s in role['AssumeRolePolicyDocument']['Statement']:
             if s['Principal'] == "*":  # Dear mother of god, you're p0wned
-                logger.error("Found an assume role policy that trusts everything!!!: {}".format(role_arn))
-                raise GameOverManGameOverException("Found an assume role policy that trusts everything!!!: {}".format(role['Arn']))
+                logger.error(
+                    f"Found an assume role policy that trusts everything!!!: {role_arn}"
+                )
+                raise GameOverManGameOverException(
+                    f"Found an assume role policy that trusts everything!!!: {role['Arn']}"
+                )
             elif 'AWS' in s['Principal']:  # This means it's trusting an AWS Account and not an AWS Service.
                 if type(s['Principal']['AWS']) is list:
                     for p in s['Principal']['AWS']:
@@ -102,11 +110,16 @@ def process_trusted_account(principal, role_arn):
     elif re.match('^[0-9]{12}$', principal):
         account_id = principal
     elif principal == "*":
-        logger.error("Found an assume role policy that trusts everything!!!: {}".format(role_arn))
-        raise GameOverManGameOverException("Found an assume role policy that trusts everything!!!: {}".format(role_arn))
-        return()  # No accounts to add to the DB
+        logger.error(
+            f"Found an assume role policy that trusts everything!!!: {role_arn}"
+        )
+        raise GameOverManGameOverException(
+            f"Found an assume role policy that trusts everything!!!: {role_arn}"
+        )
     else:
-        logger.error("Unable to identify what kind of AWS Principal this is: {}".format(principal))
+        logger.error(
+            f"Unable to identify what kind of AWS Principal this is: {principal}"
+        )
         return()
 
     response = account_table.get_item(
@@ -115,7 +128,7 @@ def process_trusted_account(principal, role_arn):
         ConsistentRead=True
     )
     if 'Item' not in response:
-        logger.info(u"Adding foreign account {}".format(account_id))
+        logger.info(f"Adding foreign account {account_id}")
         try:
             response = account_table.put_item(
                 Item={
@@ -125,7 +138,7 @@ def process_trusted_account(principal, role_arn):
                 }
             )
         except ClientError as e:
-            raise AccountUpdateError(u"Unable to create {}: {}".format(a[u'Name'], e))
+            raise AccountUpdateError(f"Unable to create {a['Name']}: {e}")
 
 
 def discover_users(account):
@@ -141,12 +154,12 @@ def discover_users(account):
         response = iam_client.list_users(Marker=response['Marker'])
     users += response['Users']
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = account.account_id
-    resource_item['awsAccountName']                 = account.account_name
-    resource_item['resourceType']                   = "AWS::IAM::User"
-    resource_item['source']                         = "Antiope"
-
+    resource_item = {
+        'awsAccountId': account.account_id,
+        'awsAccountName': account.account_name,
+        'resourceType': "AWS::IAM::User",
+        'source': "Antiope",
+    }
     for user in users:
         resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
         resource_item['configuration']                  = user
@@ -168,9 +181,7 @@ def discover_users(account):
             if 'LoginProfile' in response:
                 resource_item['supplementaryConfiguration']['LoginProfile'] = response["LoginProfile"]
         except ClientError as e:
-            if e.response['Error']['Code'] == "NoSuchEntity":
-                pass
-            else:
+            if e.response['Error']['Code'] != "NoSuchEntity":
                 raise
 
         save_resource_to_s3(USER_RESOURCE_PATH, resource_item['resourceId'], resource_item)
@@ -183,12 +194,12 @@ def discover_saml_provider(account):
     iam_client = account.get_client('iam')
     response = iam_client.list_saml_providers()
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = account.account_id
-    resource_item['awsAccountName']                 = account.account_name
-    resource_item['resourceType']                   = "AWS::IAM::SAML"
-    resource_item['source']                         = "Antiope"
-
+    resource_item = {
+        'awsAccountId': account.account_id,
+        'awsAccountName': account.account_name,
+        'resourceType': "AWS::IAM::SAML",
+        'source': "Antiope",
+    }
     for idp in response['SAMLProviderList']:
 
         # The Metadata doc (with the useful deets) are in an XML doc that requires another call

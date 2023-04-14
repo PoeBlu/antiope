@@ -22,9 +22,9 @@ RESOURCE_TYPE = "AWS::CloudTrail::Trail"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -32,13 +32,17 @@ def lambda_handler(event, context):
             discover_trails(target_account, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -48,13 +52,13 @@ def discover_trails(target_account, region):
     ct_client = target_account.get_client('cloudtrail', region=region)
     response = ct_client.describe_trails()
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = RESOURCE_TYPE
-    resource_item['awsRegion']                      = region
-    resource_item['source']                         = "Antiope"
-
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': RESOURCE_TYPE,
+        'awsRegion': region,
+        'source': "Antiope",
+    }
     for trail in response['trailList']:
 
         # CloudTrail will return trails from other regions if that trail is collecting events from the region where the api call was made
@@ -66,7 +70,9 @@ def discover_trails(target_account, region):
         resource_item['configuration']                  = trail
         # resource_item['tags']                           = ct_client.list_tags(ResourceIdList=[ trail['TrailARN'] ] )
         resource_item['supplementaryConfiguration']     = {}
-        resource_item['resourceId']                     = "{}-{}-{}".format(trail['Name'], target_account.account_id, region)
+        resource_item[
+            'resourceId'
+        ] = f"{trail['Name']}-{target_account.account_id}-{region}"
         resource_item['resourceName']                   = trail['Name']
         resource_item['ARN']                            = trail['TrailARN']
         resource_item['errors']                         = {}

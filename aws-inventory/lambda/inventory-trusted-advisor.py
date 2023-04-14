@@ -31,9 +31,9 @@ CATEGORIES = ['security', 'fault_tolerance', 'service_limits']
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -43,29 +43,31 @@ def lambda_handler(event, context):
             process_ta_check(target_account, support_client, c)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
         if e.response['Error']['Code'] == "SubscriptionRequiredException":
-            logger.error("Premium support is not enabled in {}({})".format(target_account.account_name, target_account.account_id))
+            logger.error(
+                f"Premium support is not enabled in {target_account.account_name}({target_account.account_id})"
+            )
             return()
         else:
-            logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+            logger.critical(
+                f"AWS Error getting info for {target_account.account_name}: {e}"
+            )
             raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
 def get_checks(target_account, client):
     '''Get a List of all the trusted advisor checks, return those that match CATEGORIES'''
 
-    checks = []
     response = client.describe_trusted_advisor_checks(language='en')
-    for c in response['checks']:
-        if c['category'] in CATEGORIES:
-            checks.append(c)
-    return(checks)
+    return [c for c in response['checks'] if c['category'] in CATEGORIES]
 
 
 def process_ta_check(target_account, client, c):
@@ -83,15 +85,15 @@ def process_ta_check(target_account, client, c):
     if check['status'] == "ok":
         return()
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = "AWS::TrustedAdvisor::CheckResult"
-    resource_item['source']                         = "Antiope"
-
-    resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
-    resource_item['configuration']                  = check
-    resource_item['supplementaryConfiguration']     = {}
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': "AWS::TrustedAdvisor::CheckResult",
+        'source': "Antiope",
+        'configurationItemCaptureTime': str(datetime.datetime.now()),
+        'configuration': check,
+        'supplementaryConfiguration': {},
+    }
     resource_item['supplementaryConfiguration']['CheckData'] = c
     resource_item['resourceId']                     = check['checkId']
     resource_item['resourceName']                   = c['name']

@@ -29,13 +29,8 @@ logging.getLogger('botocore').setLevel(logging.WARNING)
 logging.getLogger('boto3').setLevel(logging.WARNING)
 
 
-def safe_dump_json(obj)->dict:
-    # TODO needs to be able to parse json of json
-    json_obj = {}
-    for key in obj.__dict__.keys():
-        json_obj[key] = str(obj.__dict__[key])
-
-    return json_obj
+def safe_dump_json(obj) -> dict:
+    return {key: str(obj.__dict__[key]) for key in obj.__dict__.keys()}
 
 
 def get_azure_creds(secret_name):
@@ -56,8 +51,7 @@ def get_azure_creds(secret_name):
             secret_value = get_secret_value_response['SecretBinary']
 
     try:
-        secret_dict = json.loads(secret_value)
-        return secret_dict
+        return json.loads(secret_value)
     except Exception as e:
         logger.critical(f"Error during Credential and Service extraction: {e}")
         return(None)
@@ -65,7 +59,7 @@ def get_azure_creds(secret_name):
 
 def save_resource_to_s3(prefix, resource_id, resource):
     s3client = boto3.client('s3')
-    object_key = "Azure-Resources/{}/{}.json".format(prefix, resource_id)
+    object_key = f"Azure-Resources/{prefix}/{resource_id}.json"
 
     try:
         s3client.put_object(
@@ -75,7 +69,7 @@ def save_resource_to_s3(prefix, resource_id, resource):
             Key=object_key,
         )
     except ClientError as e:
-        logger.error("Unable to save object {}: {}".format(object_key, e))
+        logger.error(f"Unable to save object {object_key}: {e}")
 
 
 def return_azure_creds(app_id,key, tenant_id):
@@ -114,11 +108,10 @@ def get_public_ips_of_subscription(azure_creds, subscription_id):
 
     network_management_client = NetworkManagementClient(creds, subscription_id)
 
-    public_ip_addresses = []
-    for ip in network_management_client.public_ip_addresses.list_all():
-        public_ip_addresses.append(safe_dump_json(ip))
-
-    return public_ip_addresses
+    return [
+        safe_dump_json(ip)
+        for ip in network_management_client.public_ip_addresses.list_all()
+    ]
 
 
 def get_vms(azure_creds, subscription_id):
@@ -127,11 +120,10 @@ def get_vms(azure_creds, subscription_id):
 
     compute_management_client = ComputeManagementClient(creds, subscription_id)
 
-    vm_list = []
-    for m in compute_management_client.virtual_machines.list_all():
-        vm_list.append(safe_dump_json(m))
-
-    return vm_list
+    return [
+        safe_dump_json(m)
+        for m in compute_management_client.virtual_machines.list_all()
+    ]
 
 
 def get_disks(azure_creds, subscription_id):
@@ -174,12 +166,8 @@ def get_logic_apps(azure_creds, subscription_id):
     return _generic_json_list_return(logic_app_client.list_operations())
 
     
-def _generic_json_list_return(object_list)-> list:
-    return_list = []
-    for m in object_list:
-        return_list.append(safe_dump_json(m))
-
-    return return_list
+def _generic_json_list_return(object_list) -> list:
+    return [safe_dump_json(m) for m in object_list]
     
 
 def get_storage_accounts(azure_creds, subscription_id):
@@ -188,11 +176,7 @@ def get_storage_accounts(azure_creds, subscription_id):
 
     storage_client = StorageManagementClient(creds, subscription_id)
 
-    storage_list = []
-    for ss in storage_client.storage_accounts.list():
-        storage_list.append(safe_dump_json(ss))
-
-    return storage_list
+    return [safe_dump_json(ss) for ss in storage_client.storage_accounts.list()]
 
 def get_web_sites(azure_creds, subscription_id):
 
@@ -200,8 +184,4 @@ def get_web_sites(azure_creds, subscription_id):
 
     web_client = WebSiteManagementClient(creds, subscription_id)
 
-    website_list = []
-    for website in web_client.web_apps.list():
-        website_list.append(safe_dump_json(website))
-
-    return website_list
+    return [safe_dump_json(website) for website in web_client.web_apps.list()]

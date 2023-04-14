@@ -57,10 +57,7 @@ def main(args, logger):
 
 
     # print(es.indices)
-    if not args.index:
-        search_index = "resources_*"
-    else:
-        search_index = args.index
+    search_index = args.index if args.index else "resources_*"
     for index_name in es.indices.get(search_index):
         print(f"Index: {index_name}")
         doc['index-pattern']['title'] = index_name
@@ -74,11 +71,10 @@ def get_endpoint(domain, region):
     es_client = boto3.client('es', region_name=region)
 
     response = es_client.describe_elasticsearch_domain(DomainName=domain)
-    if 'DomainStatus' in response:
-        if 'Endpoint' in response['DomainStatus']:
-            return(response['DomainStatus']['Endpoint'])
+    if 'DomainStatus' in response and 'Endpoint' in response['DomainStatus']:
+        return(response['DomainStatus']['Endpoint'])
 
-    logger.error("Unable to get ES Endpoint for {}".format(domain))
+    logger.error(f"Unable to get ES Endpoint for {domain}")
     return(None)
 
 
@@ -96,9 +92,7 @@ def do_args():
     parser.add_argument("--index", help="Ony dump the mapping for this index")
     parser.add_argument("--region", help="AWS Region")
 
-    args = parser.parse_args()
-
-    return(args)
+    return parser.parse_args()
 
 if __name__ == '__main__':
 

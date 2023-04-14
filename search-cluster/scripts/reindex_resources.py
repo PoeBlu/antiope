@@ -44,18 +44,13 @@ def main(args, logger):
     response = s3_client.list_objects_v2(Bucket=bucket, MaxKeys=BATCH_SIZE, Prefix=args.prefix)
     while response['IsTruncated']:
 
-        files = []
-        for o in response['Contents']:
-            files.append(o['Key'])
+        files = [o['Key'] for o in response['Contents']]
         file_count += send_message(sqs_client, queue_url, bucket, files)
         counter += 1
 
         response = s3_client.list_objects_v2(Bucket=bucket, MaxKeys=BATCH_SIZE, Prefix=args.prefix, ContinuationToken=response['NextContinuationToken'])
 
-    # Do last stuff
-    files = []
-    for o in response['Contents']:
-        files.append(o['Key'])
+    files = [o['Key'] for o in response['Contents']]
     file_count += send_message(sqs_client, queue_url, bucket, files)
     counter += 1
 
@@ -103,10 +98,7 @@ def get_stack(stackname):
     try:
         response = cf_client.describe_stacks(StackName=stackname)
         return(response['Stacks'][0])
-    except ClientError as e:
-        print(f"Failed to find CF Stack {stackname}: {e}. Aborting...")
-        exit(1)
-    except KeyError as e:
+    except (ClientError, KeyError) as e:
         print(f"Failed to find CF Stack {stackname}: {e}. Aborting...")
         exit(1)
     except IndexError as e:
@@ -125,9 +117,7 @@ def do_args():
     parser.add_argument("--stackname", help="CF Stack with Bucket & SQS", required=True)
     parser.add_argument("--prefix", help="Re-Index resources with this prefix", required=True)
 
-    args = parser.parse_args()
-
-    return(args)
+    return parser.parse_args()
 
 if __name__ == '__main__':
 

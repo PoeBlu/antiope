@@ -17,7 +17,7 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 
 # Lambda main routine
 def handler(event, context):
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     credential_info = get_azure_creds(os.environ['AZURE_SECRET_NAME'])
     if credential_info is None:

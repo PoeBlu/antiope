@@ -38,9 +38,9 @@ class ForeignAWSAccount(object):
             self.__dict__.update(self.db_record)
             # self.account_name = str(self.account_name.encode('ascii', 'ignore'))
         except IndexError as e:
-            raise AccountLookupError("ID {} not found".format(account_id))
+            raise AccountLookupError(f"ID {account_id} not found")
         except Exception as e:
-            logger.error("Got Other error: {}".format(e))
+            logger.error(f"Got Other error: {e}")
 
     def __str__(self):
         """when converted to a string, become the account_id"""
@@ -48,7 +48,7 @@ class ForeignAWSAccount(object):
 
     def __repr__(self):
         """Create a useful string for this class if referenced"""
-        return("<ForeignAWSAccount {} >".format(self.account_id))
+        return f"<ForeignAWSAccount {self.account_id} >"
 
     #
     # Database functions
@@ -58,7 +58,7 @@ class ForeignAWSAccount(object):
         Update a specific attribute in a specific table for this account.
         key is the column, value is the new value to set
         """
-        logger.info(u"Adding key:{} value:{} to account {}".format(key, value, self))
+        logger.info(f"Adding key:{key} value:{value} to account {self}")
         try:
             response = self.account_table.update_item(
                 Key= {
@@ -73,13 +73,15 @@ class ForeignAWSAccount(object):
                 }
             )
         except ClientError as e:
-            raise AccountUpdateError("Failed to update {} to {} in account table: {}".format(key, value, e))
+            raise AccountUpdateError(
+                f"Failed to update {key} to {value} in account table: {e}"
+            )
 
     def get_attribute(self, key):
         """
         Fetches a attribute from the specificed table for the account
         """
-        logger.info(u"Getting key:{} from account_table for account {}".format(key, self))
+        logger.info(f"Getting key:{key} from account_table for account {self}")
         try:
             response = self.account_table.get_item(
                 Key= {
@@ -89,15 +91,19 @@ class ForeignAWSAccount(object):
             )
             return(response['Item'][key])
         except ClientError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
         except KeyError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
 
     def delete_attribute(self, key):
         """
         Delete a attribute from the specificed table for the account
         """
-        logger.info(u"Deleting key:{} from account table for account {}".format(key, self))
+        logger.info(f"Deleting key:{key} from account table for account {self}")
         table = self.account_table
         try:
             response = table.update_item(
@@ -113,9 +119,13 @@ class ForeignAWSAccount(object):
                 # }
             )
         except ClientError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
         except KeyError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
 
 
 class AccountUpdateError(Exception):

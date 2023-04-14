@@ -30,7 +30,7 @@ table_format = ["projectId", "projectName", "projectNumber", "lifecycleState", "
 
 # Lambda main routine
 def handler(event, context):
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
     dynamodb = boto3.resource('dynamodb')
     account_table = dynamodb.Table(os.environ['PROJECT_TABLE'])
 
@@ -48,7 +48,7 @@ def handler(event, context):
         j = {}
         table_data += "<tr>"
         for col_name in table_format:
-            table_data += "<td>{}</td>".format(getattr(project, col_name))
+            table_data += f"<td>{getattr(project, col_name)}</td>"
             j[col_name] = getattr(project, col_name)
         table_data += "</tr>\n"
         json_data.append(project.json_data)
@@ -62,14 +62,14 @@ def handler(event, context):
         )
         html_body = str(response['Body'].read().decode("utf-8"))
     except ClientError as e:
-        logger.error("ClientError getting HTML Template: {}".format(e))
+        logger.error(f"ClientError getting HTML Template: {e}")
         raise
 
     # This assumes only three {} in the template
     try:
         file = html_body.format(os.environ['INVENTORY_BUCKET'], len(project_list), table_data, datetime.datetime.now())
     except Exception as e:
-        logger.error("Error generating HTML Report. Template correct? : {}".format(e))
+        logger.error(f"Error generating HTML Report. Template correct? : {e}")
         raise
 
     try:
@@ -90,7 +90,7 @@ def handler(event, context):
             Key='Reports/gcp_project_inventory.json',
         )
     except ClientError as e:
-        logger.error("ClientError saving report: {}".format(e))
+        logger.error(f"ClientError saving report: {e}")
         raise
 
     return(event)

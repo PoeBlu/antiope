@@ -90,7 +90,7 @@ def main(args, logger):
                 if not is_principal_trusted(p, trusted_accounts):
                     trusted_principals.append(p)
         try:
-            if len(trusted_principals) > 0:
+            if trusted_principals:
                 print(f"\t{doc['awsAccountName']} ({doc['awsAccountId']}) - {doc['configuration']['RoleName']} Trusts {','.join(trusted_principals)}")
                 found_counter += 1
         except TypeError as e:
@@ -102,16 +102,8 @@ def main(args, logger):
     exit(0)
 
 def is_principal_trusted(principal, trusted_accounts):
-    if "arn" in principal:
-        # We need to extract the account_id
-        account_id = principal.split(":")[4]
-    else:
-        account_id = principal
-
-    if account_id in trusted_accounts:
-        return(True)
-    else:
-        return(False)
+    account_id = principal.split(":")[4] if "arn" in principal else principal
+    return account_id in trusted_accounts
 
 
 def get_endpoint(domain):
@@ -119,11 +111,10 @@ def get_endpoint(domain):
     es_client = boto3.client('es')
 
     response = es_client.describe_elasticsearch_domain(DomainName=domain)
-    if 'DomainStatus' in response:
-        if 'Endpoint' in response['DomainStatus']:
-            return(response['DomainStatus']['Endpoint'])
+    if 'DomainStatus' in response and 'Endpoint' in response['DomainStatus']:
+        return(response['DomainStatus']['Endpoint'])
 
-    logger.error("Unable to get ES Endpoint for {}".format(domain))
+    logger.error(f"Unable to get ES Endpoint for {domain}")
     return(None)
 
 if __name__ == '__main__':
@@ -160,6 +151,6 @@ if __name__ == '__main__':
     # Wrap in a handler for Ctrl-C
     try:
         rc = main(args, logger)
-        print("Lambda executed with {}".format(rc))
+        print(f"Lambda executed with {rc}")
     except KeyboardInterrupt:
         exit(1)

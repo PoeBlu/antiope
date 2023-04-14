@@ -22,9 +22,9 @@ RESOURCE_TYPE = "AWS::CloudFront::Distribution"
 
 def lambda_handler(event, context):
     set_debug(event, logger)
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
 
@@ -33,12 +33,12 @@ def lambda_handler(event, context):
         # Cloudfront is a global service
         cf_client = target_account.get_client('cloudfront')
 
-        resource_item = {}
-        resource_item['awsAccountId']                   = target_account.account_id
-        resource_item['awsAccountName']                 = target_account.account_name
-        resource_item['resourceType']                   = RESOURCE_TYPE
-        resource_item['source']                         = "Antiope"
-
+        resource_item = {
+            'awsAccountId': target_account.account_id,
+            'awsAccountName': target_account.account_name,
+            'resourceType': RESOURCE_TYPE,
+            'source': "Antiope",
+        }
         for distribution in list_distributions(cf_client, target_account):
 
             resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
@@ -52,13 +52,17 @@ def lambda_handler(event, context):
             save_resource_to_s3(RESOURCE_PATH, distribution['Id'], resource_item)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -66,11 +70,9 @@ def list_distributions(cf_client, target_account):
     distributions = []
     response = cf_client.list_distributions()
     while 'NextMarker' in response['DistributionList']:
-        for i in response['DistributionList']['Items']:
-            distributions.append(i)
+        distributions.extend(iter(response['DistributionList']['Items']))
         response = cf_client.list_distributions(Marker=response['NextMarker'])
     if 'Items' not in response['DistributionList']:
         return(distributions)
-    for i in response['DistributionList']['Items']:
-        distributions.append(i)
+    distributions.extend(iter(response['DistributionList']['Items']))
     return(distributions)

@@ -16,7 +16,7 @@ try:
     from cftdeploy.manifest import *
 except ImportError as e:
     print("Must install python module cftdeploy")
-    print("Error: {}".format(e))
+    print(f"Error: {e}")
     exit(1)
 
 import logging
@@ -67,7 +67,7 @@ def main(args):
     try:
         manifest_file = f"{args.stack}/cloudformation/{dest_stack_name}-Manifest.yaml"
         if args.path:
-            manifest_file = args.path + "/" + manifest_file
+            manifest_file = f"{args.path}/{manifest_file}"
 
         logger.debug(f"manifest_file: {manifest_file}")
         my_manifest = CFManifest(manifest_file, region=dst_data['AWS_DEFAULT_REGION'])
@@ -197,8 +197,7 @@ def do_args():
     parser.add_argument("--stack", help="Antiope Component to promote", required=True)
     parser.add_argument("--path", help="Manifest Path (if not relative to this script)")
 
-    args = parser.parse_args()
-    return(args)
+    return parser.parse_args()
 
 if __name__ == '__main__':
 

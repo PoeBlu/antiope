@@ -21,9 +21,9 @@ RESOURCE_PATH = "kms/key"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -31,13 +31,17 @@ def lambda_handler(event, context):
             discover_keys(target_account, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -62,19 +66,18 @@ def process_key(client, key_arn, target_account, region):
     try:
         key = client.describe_key(KeyId=key_arn)['KeyMetadata']
     except ClientError as e:
-        if e.response['Error']['Code'] == 'AccessDeniedException':
-            logger.error(f"Unable to get details of key {key_arn}: AccessDenied")
-            return()
-        else:
+        if e.response['Error']['Code'] != 'AccessDeniedException':
             raise
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = "AWS::KMS::Key"
-    resource_item['source']                         = "Antiope"
-
-    resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+        logger.error(f"Unable to get details of key {key_arn}: AccessDenied")
+        return()
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': "AWS::KMS::Key",
+        'source': "Antiope",
+        'configurationItemCaptureTime': str(datetime.datetime.now()),
+    }
     resource_item['awsRegion']                      = region
     resource_item['configuration']                  = key
     resource_item['supplementaryConfiguration']     = {}
@@ -93,8 +96,7 @@ def process_key(client, key_arn, target_account, region):
             raise
 
     try:
-        aliases = get_key_aliases(client, key_arn)
-        if aliases:
+        if aliases := get_key_aliases(client, key_arn):
             resource_item['supplementaryConfiguration']['Aliases'] = aliases
     except ClientError as e:
         if e.response['Error']['Code'] == 'NotFoundException':
@@ -106,8 +108,7 @@ def process_key(client, key_arn, target_account, region):
 
     try:
         policies = get_policy_list(client, key_arn)
-        policy = get_key_policy(client, key_arn, policies)
-        if policy:
+        if policy := get_key_policy(client, key_arn, policies):
             resource_item['supplementaryConfiguration']['ResourcePolicy'] = policy
     except ClientError as e:
         if e.response['Error']['Code'] == 'NotFoundException':
@@ -118,8 +119,7 @@ def process_key(client, key_arn, target_account, region):
             raise
 
     try:
-        tags = get_key_tags(client, key_arn)
-        if tags:
+        if tags := get_key_tags(client, key_arn):
             resource_item['tags'] = tags
     except ClientError as e:
         if e.response['Error']['Code'] == 'NotFoundException':
@@ -130,8 +130,7 @@ def process_key(client, key_arn, target_account, region):
             raise
 
     try:
-        grants = get_key_grants(client, key_arn)
-        if grants:
+        if grants := get_key_grants(client, key_arn):
             resource_item['supplementaryConfiguration']['Grants'] = grants
     except ClientError as e:
         if e.response['Error']['Code'] == 'NotFoundException':
@@ -276,10 +275,7 @@ def kms_parse_tags(tagset):
     '''
 
     try:
-        output = {}
-        for tag in tagset:
-            output[tag['TagKey']] = tag['TagValue']
-        return(output)
+        return {tag['TagKey']: tag['TagValue'] for tag in tagset}
     except Exception as e:
-        logger.error("Unable to parse tagset {}: {}".format(tagset, e))
+        logger.error(f"Unable to parse tagset {tagset}: {e}")
         raise

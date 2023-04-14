@@ -34,9 +34,7 @@ def get_gcp_creds(secret_name):
         secret_value = get_secret_value_response['SecretBinary']
 
     try:
-        secret_dict = json.loads(secret_value)
-        # credential_dict = json.loads(secret_dict['credentials'])
-        return(secret_dict)
+        return json.loads(secret_value)
     except Exception as e:
         logger.critical(f"Error during Credential and Service extraction: {e}")
         return(None)
@@ -45,7 +43,7 @@ def get_gcp_creds(secret_name):
 def save_resource_to_s3(prefix, resource_id, resource):
     s3client = boto3.client('s3')
     try:
-        object_key = "GCP-Resources/{}/{}.json".format(prefix, resource_id)
+        object_key = f"GCP-Resources/{prefix}/{resource_id}.json"
         s3client.put_object(
             Body=json.dumps(resource, sort_keys=True, default=str, indent=2),
             Bucket=os.environ['INVENTORY_BUCKET'],
@@ -53,15 +51,12 @@ def save_resource_to_s3(prefix, resource_id, resource):
             Key=object_key,
         )
     except ClientError as e:
-        logger.error("Unable to save object {}: {}".format(object_key, e))
+        logger.error(f"Unable to save object {object_key}: {e}")
 
 
 def get_active_projects():
     project_ids = get_all_project_ids(status="ACTIVE")
-    output = []
-    for project_id in project_ids:
-        output.append(GCPProject(project_id))
-    return(output)
+    return [GCPProject(project_id) for project_id in project_ids]
 
 
 def get_all_project_ids(status=None):
@@ -81,11 +76,8 @@ def get_all_project_ids(status=None):
             ExclusiveStartKey=response['LastEvaluatedKey']
         )
     project_list = project_list + response['Items']
-    output = []
-    for a in project_list:
-        if status is None:  # Then we get everything
-            output.append(a['projectId'])
-        elif a['lifecycleState'] == status:  # this is what we asked for
-            output.append(a['projectId'])
-        # Otherwise, don't bother.
-    return(output)
+    return [
+        a['projectId']
+        for a in project_list
+        if status is None or a['lifecycleState'] == status
+    ]

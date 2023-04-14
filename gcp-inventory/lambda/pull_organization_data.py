@@ -18,7 +18,7 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 
 # Lambda main routine
 def handler(event, context):
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     dynamodb = boto3.resource('dynamodb')
     project_table = dynamodb.Table(os.environ['PROJECT_TABLE'])
@@ -61,9 +61,7 @@ def get_projects(credential_info):
     request = service.projects().list()
     while request is not None:
         response = request.execute()
-        for project in response['projects']:
-            project_list.append(project)
-
+        project_list.extend(iter(response['projects']))
         request = service.projects().list_next(
             previous_request=request,
             previous_response=response
@@ -73,7 +71,9 @@ def get_projects(credential_info):
 
 
 def create_or_update_project(project, project_table):
-    logger.info(u"Adding project {} with name {} and number {}".format(project[u'projectId'], project[u'name'], project[u'projectNumber']))
+    logger.info(
+        f"Adding project {project['projectId']} with name {project['name']} and number {project['projectNumber']}"
+    )
 
     expression = "set projectName=:name, lifecycleState=:lifecycleState, createTime=:createTime, projectNumber=:projectNumber, parent=:parent"
     payload = {
@@ -95,7 +95,7 @@ def create_or_update_project(project, project_table):
         )
 
     except ClientError as e:
-        raise AccountUpdateError(u"Unable to create {}: {}".format(project[u'name'], e))
+        raise AccountUpdateError(f"Unable to create {project['name']}: {e}")
     except KeyError as e:
         logger.critical(f"Project {project['projectId']} is missing a key: {e}")
 

@@ -28,9 +28,9 @@ GW_TYPE = "AWS::DX::DXGW"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -48,13 +48,17 @@ def lambda_handler(event, context):
             save_resource_to_s3(GW_PATH, resource_item['resourceId'], resource_item)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -64,13 +68,13 @@ def discover_connections(target_account, region):
     dx_client = target_account.get_client('directconnect', region=region)
     response = dx_client.describe_connections()
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = CONNECTION_TYPE
-    resource_item['source']                         = "Antiope"
-    resource_item['awsRegion']                      = region
-
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': CONNECTION_TYPE,
+        'source': "Antiope",
+        'awsRegion': region,
+    }
     for c in response['connections']:
         resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
         resource_item['configuration']                  = c
@@ -88,15 +92,15 @@ def discover_vifs(target_account, region, dx_gws):
     dx_client = target_account.get_client('directconnect', region=region)
     response = dx_client.describe_virtual_interfaces()
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = VIF_TYPE
-    resource_item['source']                         = "Antiope"
-    resource_item['awsRegion']                      = region
-
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': VIF_TYPE,
+        'source': "Antiope",
+        'awsRegion': region,
+    }
     for vif in response['virtualInterfaces']:
-        print("Found VIF {}".format(vif['virtualInterfaceId']))
+        print(f"Found VIF {vif['virtualInterfaceId']}")
         resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
         resource_item['configuration']                  = vif
         resource_item['supplementaryConfiguration']     = {}
@@ -104,7 +108,11 @@ def discover_vifs(target_account, region, dx_gws):
         resource_item['resourceName']                   = vif['virtualInterfaceName']
         resource_item['errors']                         = {}
         # The same VIF ID will be discovered in the account with the DX Connection, and the account the DX is shared with.
-        save_resource_to_s3(VIF_PATH, "{}-{}".format(resource_item['resourceId'], target_account.account_id), resource_item)
+        save_resource_to_s3(
+            VIF_PATH,
+            f"{resource_item['resourceId']}-{target_account.account_id}",
+            resource_item,
+        )
 
         if vif['ownerAccount'] != target_account.account_id:
             continue  # Don't marry DXGWs for the account that's sharing out the VIF.
@@ -115,7 +123,7 @@ def discover_vifs(target_account, region, dx_gws):
                 # The vif data structure contains region, so we don't need to add that here.
                 dx_gws[vif['directConnectGatewayId']]['supplementaryConfiguration']['VirtualInterfaces'].append(vif)
             else:
-                error_mesg = "Found VIF {} in {} with a directConnectGatewayId of {}, but no DXGW with that id exists".format(vif['virtualInterfaceId'], region, vif['directConnectGatewayId'])
+                error_mesg = f"Found VIF {vif['virtualInterfaceId']} in {region} with a directConnectGatewayId of {vif['directConnectGatewayId']}, but no DXGW with that id exists"
                 logger.critical(error_mesg)
                 raise Exception(error_mesg)
 
@@ -130,12 +138,12 @@ def discover_gateways(target_account):
     dx_client = target_account.get_client('directconnect')
     response = dx_client.describe_direct_connect_gateways()
 
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = GW_TYPE
-    resource_item['source']                         = "Antiope"
-
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': GW_TYPE,
+        'source': "Antiope",
+    }
     for c in response['directConnectGateways']:
         resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
         resource_item['configuration']                  = c

@@ -79,11 +79,10 @@ def get_endpoint(domain):
     es_client = boto3.client('es')
 
     response = es_client.describe_elasticsearch_domain(DomainName=domain)
-    if 'DomainStatus' in response:
-        if 'Endpoint' in response['DomainStatus']:
-            return(response['DomainStatus']['Endpoint'])
+    if 'DomainStatus' in response and 'Endpoint' in response['DomainStatus']:
+        return(response['DomainStatus']['Endpoint'])
 
-    logger.error("Unable to get ES Endpoint for {}".format(domain))
+    logger.error(f"Unable to get ES Endpoint for {domain}")
     return(None)
 
 if __name__ == '__main__':
@@ -119,6 +118,6 @@ if __name__ == '__main__':
     # Wrap in a handler for Ctrl-C
     try:
         rc = main(args, logger)
-        print("Lambda executed with {}".format(rc))
+        print(f"Lambda executed with {rc}")
     except KeyboardInterrupt:
         exit(1)

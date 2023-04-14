@@ -39,9 +39,9 @@ class GCPProject(object):
             # Convert the response into instance attributes
             self.__dict__.update(self.json_data)
         except IndexError as e:
-            raise ProjectLookupError("ID {} not found".format(projectId))
+            raise ProjectLookupError(f"ID {projectId} not found")
         except Exception as e:
-            logger.error("Got Other error: {}".format(e))
+            logger.error(f"Got Other error: {e}")
 
     def __str__(self):
         """when converted to a string, become the projectId"""
@@ -49,7 +49,7 @@ class GCPProject(object):
 
     def __repr__(self):
         '''Create a useful string for this class if referenced'''
-        return("<Antiope.GCPProject {} >".format(self.projectId))
+        return f"<Antiope.GCPProject {self.projectId} >"
 
     #
     # Database functions
@@ -58,7 +58,7 @@ class GCPProject(object):
         '''    update a specific attribute in a specific table for this project
             table_name should be a valid DynDB table, key is the column, value is the new value to set
         '''
-        logger.info(u"Adding key:{} value:{} to project {}".format(key, value, self))
+        logger.info(f"Adding key:{key} value:{value} to project {self}")
         table = self.dynamodb.Table(table_name)
         try:
             response = table.update_item(
@@ -74,13 +74,15 @@ class GCPProject(object):
                 }
             )
         except ClientError as e:
-            raise ProjectUpdateError("Failed to update {} to {} in {}: {}".format(key, value, table_name, e))
+            raise ProjectUpdateError(
+                f"Failed to update {key} to {value} in {table_name}: {e}"
+            )
 
     def get_attribute(self, table_name, key):
         '''
         Pulls a attribute from the specificed table for the project
         '''
-        logger.info(u"Getting key:{} from:{} for project {}".format(key, table_name, self))
+        logger.info(f"Getting key:{key} from:{table_name} for project {self}")
         table = self.dynamodb.Table(table_name)
         try:
             response = table.get_item(
@@ -91,15 +93,19 @@ class GCPProject(object):
             )
             return(response['Item'][key])
         except ClientError as e:
-            raise ProjectLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise ProjectLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
         except KeyError as e:
-            raise ProjectLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise ProjectLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
 
     def delete_attribute(self, table_name, key):
         '''
         Pulls a attribute from the specificed table for the project
         '''
-        logger.info(u"Deleting key:{} from:{} for project {}".format(key, table_name, self))
+        logger.info(f"Deleting key:{key} from:{table_name} for project {self}")
         table = self.dynamodb.Table(table_name)
         try:
             response = table.update_item(
@@ -115,9 +121,13 @@ class GCPProject(object):
                 # }
             )
         except ClientError as e:
-            raise ProjectLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise ProjectLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
         except KeyError as e:
-            raise ProjectLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise ProjectLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
 
 
 class ProjectUpdateError(Exception):

@@ -27,9 +27,9 @@ def lambda_handler(event, context):
     if 'DEBUG' in os.environ and os.environ['DEBUG'] == "True":
         logger.setLevel(logging.DEBUG)
 
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
 
@@ -45,19 +45,25 @@ def lambda_handler(event, context):
             process_instances(target_account, ec2_client, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
 def process_instances(target_account, ec2_client, region):
     instance_reservations = get_all_instances(ec2_client)
-    logger.debug("Found {} instance reservations for {} in {}".format(len(instance_reservations), target_account.account_id, region))
+    logger.debug(
+        f"Found {len(instance_reservations)} instance reservations for {target_account.account_id} in {region}"
+    )
 
     seen_images = []
     seen_owners = []
@@ -77,12 +83,13 @@ def process_image(target_account, ec2_client, region, image_id, seen_owners):
     # dump info about instances to S3 as json
     for image in response['Images']:
 
-        resource_item = {}
-        resource_item['awsAccountId']                   = target_account.account_id
-        resource_item['awsAccountName']                 = target_account.account_name
-        resource_item['resourceType']                   = RESOURCE_TYPE
-        resource_item['source']                         = "Antiope"
-        resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+        resource_item = {
+            'awsAccountId': target_account.account_id,
+            'awsAccountName': target_account.account_name,
+            'resourceType': RESOURCE_TYPE,
+            'source': "Antiope",
+            'configurationItemCaptureTime': str(datetime.datetime.now()),
+        }
         resource_item['awsRegion']                      = region
         resource_item['configuration']                  = image
         if 'Tags' in image:
@@ -119,7 +126,7 @@ def process_trusted_account(account_id):
         ConsistentRead=True
     )
     if 'Item' not in response:
-        logger.info(u"Adding foreign account {}".format(account_id))
+        logger.info(f"Adding foreign account {account_id}")
         try:
             response = account_table.put_item(
                 Item={
@@ -130,4 +137,4 @@ def process_trusted_account(account_id):
                 }
             )
         except ClientError as e:
-            raise AccountUpdateError(u"Unable to create {}: {}".format(a[u'Name'], e))
+            raise AccountUpdateError(f"Unable to create {a['Name']}: {e}")

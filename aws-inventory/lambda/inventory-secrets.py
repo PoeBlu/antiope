@@ -21,9 +21,9 @@ RESOURCE_PATH = "secretsmanager/secret"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -31,13 +31,17 @@ def lambda_handler(event, context):
             discover_secrets(target_account, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -57,20 +61,23 @@ def discover_secrets(target_account, region):
             process_secret(client, s, target_account, region)
 
     except EndpointConnectionError as e:
-        logger.info("Region {} not supported".format(region))
+        logger.info(f"Region {region} not supported")
 
 
 def process_secret(client, secret, target_account, region):
-    resource_item = {}
-    resource_item['awsAccountId']                   = target_account.account_id
-    resource_item['awsAccountName']                 = target_account.account_name
-    resource_item['resourceType']                   = "AWS::SecretsManager::Secret"
-    resource_item['source']                         = "Antiope"
-    resource_item['awsRegion']                      = region
-    resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+    resource_item = {
+        'awsAccountId': target_account.account_id,
+        'awsAccountName': target_account.account_name,
+        'resourceType': "AWS::SecretsManager::Secret",
+        'source': "Antiope",
+        'awsRegion': region,
+        'configurationItemCaptureTime': str(datetime.datetime.now()),
+    }
     resource_item['configuration']                  = secret
     resource_item['supplementaryConfiguration']     = {}
-    resource_item['resourceId']                     = "{}-{}-{}".format(target_account.account_id, region, secret['Name'].replace("/", "-"))
+    resource_item[
+        'resourceId'
+    ] = f"""{target_account.account_id}-{region}-{secret['Name'].replace("/", "-")}"""
     resource_item['resourceName']                   = secret['Name']
     resource_item['errors']                         = {}
     resource_item['ARN']                            = secret['ARN']

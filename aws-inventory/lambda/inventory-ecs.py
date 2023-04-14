@@ -21,9 +21,9 @@ TASK_RESOURCE_PATH = "ecs/task"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
 
@@ -40,18 +40,23 @@ def lambda_handler(event, context):
             for cluster_arn in list_clusters(ecs_client):
                 cluster = ecs_client.describe_clusters(clusters=[cluster_arn], include=['STATISTICS', 'TAGS'])['clusters'][0]
 
-                cluster_item = {}
-                cluster_item['awsAccountId']                   = target_account.account_id
-                cluster_item['awsAccountName']                 = target_account.account_name
-                cluster_item['resourceType']                   = "AWS::ECS::Cluster"
-                cluster_item['source']                         = "Antiope"
-                cluster_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+                cluster_item = {
+                    'awsAccountId': target_account.account_id,
+                    'awsAccountName': target_account.account_name,
+                    'resourceType': "AWS::ECS::Cluster",
+                    'source': "Antiope",
+                    'configurationItemCaptureTime': str(
+                        datetime.datetime.now()
+                    ),
+                }
                 cluster_item['awsRegion']                      = r
                 cluster_item['configuration']                  = cluster
                 if 'tags' in cluster:
                     cluster_item['tags']                       = parse_ecs_tags(cluster['tags'])
                 cluster_item['supplementaryConfiguration']     = {}
-                cluster_item['resourceId']                     = "{}-{}".format(cluster['clusterName'], target_account.account_id)
+                cluster_item[
+                    'resourceId'
+                ] = f"{cluster['clusterName']}-{target_account.account_id}"
                 cluster_item['resourceName']                   = cluster['clusterName']
                 cluster_item['ARN']                            = cluster['clusterArn']
                 cluster_item['errors']                         = {}
@@ -67,31 +72,40 @@ def lambda_handler(event, context):
                         logger.error(f"Unable to fetch Task Tags - Lambda Boto3 doesn't support yet. Boto3: {boto3.__version__} botocore: {botocore.__version__}")
                         task = ecs_client.describe_tasks(cluster=cluster_arn, tasks=[task_arn])['tasks'][0]
 
-                    task_item = {}
-                    task_item['awsAccountId']                   = target_account.account_id
-                    task_item['awsAccountName']                 = target_account.account_name
-                    task_item['resourceType']                   = "AWS::ECS::Task"
-                    task_item['source']                         = "Antiope"
-                    task_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+                    task_item = {
+                        'awsAccountId': target_account.account_id,
+                        'awsAccountName': target_account.account_name,
+                        'resourceType': "AWS::ECS::Task",
+                        'source': "Antiope",
+                        'configurationItemCaptureTime': str(
+                            datetime.datetime.now()
+                        ),
+                    }
                     task_item['awsRegion']                      = r
                     task_item['configuration']                  = task
                     if 'tags' in task:
                         task_item['tags']                       = parse_ecs_tags(task['tags'])
                     task_item['supplementaryConfiguration']     = {}
-                    task_item['resourceId']                     = "{}-{}".format(task['taskDefinitionArn'].split('/')[-1], target_account.account_id)
+                    task_item[
+                        'resourceId'
+                    ] = f"{task['taskDefinitionArn'].split('/')[-1]}-{target_account.account_id}"
                     task_item['resourceName']                   = task['taskDefinitionArn'].split('/')[-1]
                     task_item['ARN']                            = task['taskArn']
                     task_item['errors']                         = {}
                     save_resource_to_s3(TASK_RESOURCE_PATH, task_item['resourceId'], task_item)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -117,7 +131,4 @@ def list_clusters(ecs_client):
 
 def parse_ecs_tags(tagset):
     """Convert the tagset as returned by AWS into a normal dict of {"tagkey": "tagvalue"}"""
-    output = {}
-    for tag in tagset:
-        output[tag['key']] = tag['value']
-    return(output)
+    return {tag['key']: tag['value'] for tag in tagset}

@@ -64,10 +64,10 @@ def main(args, logger):
             print(json.dumps(hit, sort_keys=True, default=str, indent=2))
         doc = hit['_source']
 
-        # This returns an array
-        connection_ids = ""
-        for vif in doc['supplementaryConfiguration']['DXVirtualInterfaces']:
-            connection_ids += f" {vif['connectionId']},"
+        connection_ids = "".join(
+            f" {vif['connectionId']},"
+            for vif in doc['supplementaryConfiguration']['DXVirtualInterfaces']
+        )
         print(f"\t{doc['awsAccountName']} ({doc['awsAccountId']}) {doc['awsRegion']} - {doc['resourceId']} -{connection_ids[:-1]}")
     print("Got %d DX Connected VPCs" % res['hits']['total'])
 
@@ -87,10 +87,10 @@ def main(args, logger):
             print(json.dumps(hit, sort_keys=True, default=str, indent=2))
         doc = hit['_source']
 
-        cgw_ids = ""
-        for vpn in doc['supplementaryConfiguration']['VpnConnections']:
-            cgw_ids += f" {vpn['CustomerGatewayId']},"
-
+        cgw_ids = "".join(
+            f" {vpn['CustomerGatewayId']},"
+            for vpn in doc['supplementaryConfiguration']['VpnConnections']
+        )
         print(f"\t{doc['awsAccountName']} ({doc['awsAccountId']}) {doc['awsRegion']} - {doc['resourceId']} {cgw_ids[:-1]}")
     print("Got %d VPN Connected VPCs" % res['hits']['total'])
 
@@ -105,11 +105,10 @@ def get_endpoint(domain):
     es_client = boto3.client('es')
 
     response = es_client.describe_elasticsearch_domain(DomainName=domain)
-    if 'DomainStatus' in response:
-        if 'Endpoint' in response['DomainStatus']:
-            return(response['DomainStatus']['Endpoint'])
+    if 'DomainStatus' in response and 'Endpoint' in response['DomainStatus']:
+        return(response['DomainStatus']['Endpoint'])
 
-    logger.error("Unable to get ES Endpoint for {}".format(domain))
+    logger.error(f"Unable to get ES Endpoint for {domain}")
     return(None)
 
 if __name__ == '__main__':
@@ -145,6 +144,6 @@ if __name__ == '__main__':
     # Wrap in a handler for Ctrl-C
     try:
         rc = main(args, logger)
-        print("Lambda executed with {}".format(rc))
+        print(f"Lambda executed with {rc}")
     except KeyboardInterrupt:
         exit(1)

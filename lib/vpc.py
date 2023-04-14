@@ -29,7 +29,7 @@ class VPC(object):
                 Select='ALL_ATTRIBUTES'
             )
         except ClientError as e:
-            raise VPCLookupError("ClientError getting {}: {}".format(self.vpc_id, e))
+            raise VPCLookupError(f"ClientError getting {self.vpc_id}: {e}")
 
         try:
             self.db_record = response['Items'][0]
@@ -41,18 +41,13 @@ class VPC(object):
             # Convert the response into instance attributes
             self.__dict__.update(self.db_record)
         except IndexError as e:
-            raise VPCLookupError("ID {} not found".format(vpc_id))
+            raise VPCLookupError(f"ID {vpc_id} not found")
         except Exception as e:
-            logger.error("Got Other error: {}".format(e))
+            logger.error(f"Got Other error: {e}")
 
         # We should reference our account in the VPC object. Perhaps the object exists and is part of the init(),
         # perhaps it isn't and we need to create a new one.
-        if account is None:
-            # This will fail because AWSAccount is not defined and can't be imported due to circular dependencies
-            # (AWSAccount requires VPC too)
-            self.account = AWSAccount(self.account_id)
-        else:
-            self.account = account
+        self.account = AWSAccount(self.account_id) if account is None else account
 
     def __str__(self):
         """when converted to a string, become the account_id"""
@@ -60,7 +55,7 @@ class VPC(object):
 
     def __repr__(self):
         '''Create a useful string for this class if referenced'''
-        return("<VPC {} >".format(self.vpc_id))
+        return f"<VPC {self.vpc_id} >"
 
     #
     # Database functions
@@ -69,26 +64,24 @@ class VPC(object):
         '''    update a specific attribute in a specific table for this account
             table_name should be a valid DynDB table, key is the column, value is the new value to set
         '''
-        logger.info(u"Adding key:{} value:{} to VPC {}".format(key, value, self))
+        logger.info(f"Adding key:{key} value:{value} to VPC {self}")
         try:
             response = self.vpc_table.update_item(
-                Key= {
-                    'vpc_id': self.vpc_id
-                },
-                UpdateExpression="set {} = :r".format(key),
+                Key={'vpc_id': self.vpc_id},
+                UpdateExpression=f"set {key} = :r",
                 ExpressionAttributeValues={
                     ':r': value,
-                }
+                },
             )
             setattr(self, key, value)  # Also update this instance of the object
         except ClientError as e:
-            raise VPCUpdateError("Failed to update {} to {} for {}: {}".format(key, value, self, e))
+            raise VPCUpdateError(f"Failed to update {key} to {value} for {self}: {e}")
 
     def get_vpc_attribute(self, key):
         '''
         Pulls a attribute from the specificed table for the account
         '''
-        logger.info(u"Getting key: {} for {}".format(key, self))
+        logger.info(f"Getting key: {key} for {self}")
         try:
             response = self.vpc_table.get_item(
                 Key= {
@@ -98,9 +91,9 @@ class VPC(object):
             )
             return(response['Item'][key])
         except ClientError as e:
-            raise VPCLookupError("Failed to get {} for {}: {}".format(key, self, e))
+            raise VPCLookupError(f"Failed to get {key} for {self}: {e}")
         except KeyError as e:
-            raise VPCLookupError("Failed to get {} for {}: {}".format(key, self, e))
+            raise VPCLookupError(f"Failed to get {key} for {self}: {e}")
 
     #
     # Instance Attributes
@@ -122,8 +115,7 @@ class VPC(object):
             )
             while 'NextToken' in response:
                 for r in response['Reservations']:
-                    for i in r['Instances']:
-                        output.append(i)
+                    output.extend(iter(r['Instances']))
                 response = ec2.describe_instances(
                     Filters = filters,
                     MaxResults = 1000,
@@ -131,11 +123,10 @@ class VPC(object):
                 )
             # Done with the while loop (or never entered it) do the last batch
             for r in response['Reservations']:
-                for i in r['Instances']:
-                    output.append(i)
+                output.extend(iter(r['Instances']))
             return(output)
         except ClientError as e:
-            raise VPCLookupError("Failed to query_instances() for {}: {}".format(self, e))
+            raise VPCLookupError(f"Failed to query_instances() for {self}: {e}")
 
     def query_running_instances(self):
         '''return an array of dict representing the data from describe_instances(). Only includes running instances'''
@@ -174,9 +165,7 @@ class VPC(object):
         if not hasattr(self, "instance_states"):
             self.discover_instance_count()
 
-        if self.instance_states['running'] > 0:  # FIXME, do something about the instance counts being stale
-            return(True)
-        return(False)
+        return self.instance_states['running'] > 0
 
 
 class VPCLookupError(LookupError):

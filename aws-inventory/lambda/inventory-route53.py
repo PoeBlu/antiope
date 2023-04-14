@@ -22,9 +22,9 @@ ZONE_RESOURCE_PATH = "route53/hostedzone"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -32,13 +32,17 @@ def lambda_handler(event, context):
         discover_zones(target_account)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -59,12 +63,12 @@ def discover_domains(account):
 
     for d in domains:
 
-        resource_item = {}
-        resource_item['awsAccountId']                   = account.account_id
-        resource_item['awsAccountName']                 = account.account_name
-        resource_item['resourceType']                   = "AWS::Route53::Domain"
-        resource_item['source']                         = "Antiope"
-
+        resource_item = {
+            'awsAccountId': account.account_id,
+            'awsAccountName': account.account_name,
+            'resourceType': "AWS::Route53::Domain",
+            'source': "Antiope",
+        }
         # Get the real juicy details
         # Throttling/API Limit Info:
         # https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSLimitations.html#limits-api-requests-route-53
@@ -109,16 +113,15 @@ def discover_zones(account):
 
     for zone in zones:
 
-        resource_item = {}
-        resource_item['awsAccountId']                   = account.account_id
-        resource_item['awsAccountName']                 = account.account_name
-        resource_item['resourceType']                   = "AWS::Route53::HostedZone"
-        resource_item['source']                         = "Antiope"
-
-        resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
-        resource_item['configuration']                  = zone
-        # resource_item['tags']                           = FIXME
-        resource_item['supplementaryConfiguration']     = {}
+        resource_item = {
+            'awsAccountId': account.account_id,
+            'awsAccountName': account.account_name,
+            'resourceType': "AWS::Route53::HostedZone",
+            'source': "Antiope",
+            'configurationItemCaptureTime': str(datetime.datetime.now()),
+            'configuration': zone,
+            'supplementaryConfiguration': {},
+        }
         # Need to make sure the resource name is unique and service identifiable.
         # Zone Ids look like "/hostedzone/Z2UFNORDFDSFTZ"
         resource_item['resourceId']                     = zone['Id'].split("/")[2]

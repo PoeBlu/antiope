@@ -22,7 +22,7 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 # Lambda main routine
 def handler(event, context):
     set_debug(event, logger)
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     # We will make a HTML Table and a Json file with this data
     json_data = {"vpcs": []}
@@ -36,8 +36,7 @@ def handler(event, context):
 
         for v in a.get_vpcs():
             logger.debug(f"\tv.vpc_id")
-            j = {}
-            j['vpc'] = v.db_record.copy()
+            j = {'vpc': v.db_record.copy()}
             j['account'] = a.db_record.copy()
 
             # Skip VPCs that have nothing in them
@@ -63,7 +62,7 @@ def handler(event, context):
         )
         mako_body = str(response['Body'].read().decode("utf-8"))
     except ClientError as e:
-        logger.error("ClientError getting HTML Template: {}".format(e))
+        logger.error(f"ClientError getting HTML Template: {e}")
         raise
 
     result = Template(mako_body).render(**json_data)
@@ -86,7 +85,7 @@ def handler(event, context):
             Key='Reports/vpc_inventory.json',
         )
     except ClientError as e:
-        logger.error("ClientError saving report: {}".format(e))
+        logger.error(f"ClientError saving report: {e}")
         raise
 
     return(event)

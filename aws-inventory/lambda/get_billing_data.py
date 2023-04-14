@@ -21,9 +21,9 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 def handler(event, context):
     set_debug(event, logger)
 
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         dynamodb = boto3.resource('dynamodb')
@@ -35,7 +35,7 @@ def handler(event, context):
 
         billing_data = get_current_spend(target_account)
         if billing_data is None:
-            logger.error("No billing data returned for {}".format(account_id))
+            logger.error(f"No billing data returned for {account_id}")
             return(event)
 
         response = billing_table.put_item(
@@ -45,11 +45,13 @@ def handler(event, context):
                 'estimated_charges': str(billing_data['Maximum'])
             }
         )
-        logger.info("Saved new est charges of {} for {}({})".format(str(billing_data['Maximum']), target_account.account_name, target_account.account_id))
+        logger.info(
+            f"Saved new est charges of {str(billing_data['Maximum'])} for {target_account.account_name}({target_account.account_id})"
+        )
 
         return(event)
     except Exception as e:
-        logger.error("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.error(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 # end handler()
 
@@ -84,11 +86,11 @@ def get_current_spend(account):
                 max_point = point
         return(max_point)
     except KeyError as e:
-        logger.error("KeyError getting spend: {} -- Response: {}".format(e, response))
+        logger.error(f"KeyError getting spend: {e} -- Response: {response}")
         return(None)
     except IndexError as e:
-        logger.error("IndexError getting spend: {} -- Response: {}".format(e, response))
+        logger.error(f"IndexError getting spend: {e} -- Response: {response}")
         return(None)
     except ClientError as e:
-        logger.error("ClientError getting spend: {}".format(e))
+        logger.error(f"ClientError getting spend: {e}")
         return(None)

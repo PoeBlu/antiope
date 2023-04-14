@@ -17,7 +17,7 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 
 # Lambda main routine
 def handler(event, context):
-    logger.info("Received event: " + json.dumps(event, sort_keys=True))
+    logger.info(f"Received event: {json.dumps(event, sort_keys=True)}")
 
     dynamodb = boto3.resource('dynamodb')
     subscription_table = dynamodb.Table(os.environ['SUBSCRIPTION_TABLE'])
@@ -46,7 +46,7 @@ def handler(event, context):
 
 
 def create_or_update_subscription(subscription, subscription_table):
-    logger.info(u"Adding subscription {}".format(subscription))
+    logger.info(f"Adding subscription {subscription}")
 
     try:
         #response = subscription_table.put_item(Item=subscription)
@@ -68,7 +68,7 @@ def create_or_update_subscription(subscription, subscription_table):
                     }
                 )
     except ClientError as e:
-        raise AccountUpdateError(u"Unable to create {}: {}".format(subscription, e))
+        raise AccountUpdateError(f"Unable to create {subscription}: {e}")
     except KeyError as e:
         logger.critical(f"Subscription {subscription} is missing a key: {e}")
 

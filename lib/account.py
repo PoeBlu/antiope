@@ -43,7 +43,9 @@ class AWSAccount(object):
         self.dynamodb      = boto3.resource('dynamodb')
         self.account_table = self.dynamodb.Table(account_table_name)
         self.vpc_table     = self.dynamodb.Table(vpc_table_name)
-        self.cross_account_role_arn = "arn:aws:iam::{}:role/{}".format(self.account_id, role_name)
+        self.cross_account_role_arn = (
+            f"arn:aws:iam::{self.account_id}:role/{role_name}"
+        )
         self.default_session_name = role_session_name
 
         response = self.account_table.query(
@@ -56,9 +58,9 @@ class AWSAccount(object):
             self.__dict__.update(self.db_record)
             # self.account_name = str(self.account_name.encode('ascii', 'ignore'))
         except IndexError as e:
-            raise AccountLookupError("ID {} not found".format(account_id))
+            raise AccountLookupError(f"ID {account_id} not found")
         except Exception as e:
-            logger.error("Got Other error: {}".format(e))
+            logger.error(f"Got Other error: {e}")
 
     def __str__(self):
         """when converted to a string, become the account_id"""
@@ -66,7 +68,7 @@ class AWSAccount(object):
 
     def __repr__(self):
         """Create a useful string for this class if referenced"""
-        return("<AWSAccount {} >".format(self.account_id))
+        return f"<AWSAccount {self.account_id} >"
 
     #
     # Cross Account Role Assumption Methods
@@ -93,8 +95,9 @@ class AWSAccount(object):
             self.creds = session['Credentials']  # Save for later
             return(session['Credentials'])
         except ClientError as e:
-            raise AntiopeAssumeRoleError("Failed to assume role {} in account {} ({}): {}".format(self.cross_account_role_arn,
-                self.account_name.encode('ascii', 'ignore'), self.account_id, e.response['Error']['Code']))
+            raise AntiopeAssumeRoleError(
+                f"Failed to assume role {self.cross_account_role_arn} in account {self.account_name.encode('ascii', 'ignore')} ({self.account_id}): {e.response['Error']['Code']}"
+            )
 
     def get_client(self, type, region=None, session_name=None):
         """
@@ -132,16 +135,15 @@ class AWSAccount(object):
         ec2 = self.get_client('ec2')
         response = ec2.describe_regions()
         output = ['us-east-1']
-        for r in response['Regions']:
-            if r['RegionName'] == "us-east-1":
-                continue
-            output.append(r['RegionName'])
+        output.extend(
+            r['RegionName']
+            for r in response['Regions']
+            if r['RegionName'] != "us-east-1"
+        )
         return(output)
 
     def get_vpc_ids(self):
         """Return a list of VPC ids for the account (as cached in the VPC Table)."""
-        # TODO - Add support to filter by region
-        output   = []
         vpc_list = []
 
         vpc_table = self.vpc_table
@@ -166,10 +168,7 @@ class AWSAccount(object):
                 ExclusiveStartKey=response['LastEvaluatedKey']
             )
         vpc_list = vpc_list + response['Items']
-        # Take the list of vpc_ids and instantiate VPC Objects. Return that list
-        for v in vpc_list:
-            output.append(v['vpc_id'])
-        return(output)
+        return [v['vpc_id'] for v in vpc_list]
 
     def get_vpcs(self, region=None):
         """Return a list of VPCs for the account (as cached in the VPC Table). Optionally filter it by region"""
@@ -177,25 +176,15 @@ class AWSAccount(object):
         vpc_list = self.get_vpc_ids()
         for v in vpc_list:
             vpc = VPC(v,  account=self)
-            if region is None:
+            if region is not None and vpc.region == region or region is None:
                 output.append(vpc)
-            else:
-                if vpc.region == region:
-                    output.append(vpc)
         return(output)
 
     def get_active_vpcs(self, region=None):
         """Return a list of active VPCs (one or more running instances) for the account. Optionally filter it by region"""
-        output   = []
         vpc_list = self.get_vpcs(region)
 
-        # This could also work?
-        # nonZeroVpcs =list(filter(lambda x: x.instance_count != '0', vpcs))
-        for v in vpc_list:
-            if v.is_active():
-                output.append(v)
-            # FIXME Filter out ones that haven't been updated in last 24 hrs
-        return(output)
+        return [v for v in vpc_list if v.is_active()]
 
     #
     # Compliance Functions
@@ -210,7 +199,9 @@ class AWSAccount(object):
             else:
                 cfn_client      = self.get_client('cloudformation', region=region)
         except AntiopeAssumeRoleError:
-            logger.error("Unable to assume role looking for {} in {}".format(PhysicalResourceId, self.account_id))
+            logger.error(
+                f"Unable to assume role looking for {PhysicalResourceId} in {self.account_id}"
+            )
             return(None)
 
         # Ask Cloudformation "who owns PhysicalResourceId?"
@@ -228,7 +219,9 @@ class AWSAccount(object):
                 break
         else:
             # How is it that describe_stack_resources() returned a stack, but the Resource we searched on wasn't in the resulting dataset?
-            logger.error("Found stack {} but resource not present {} in account {}".format(stack_name, PhysicalResourceId, self.account_id))
+            logger.error(
+                f"Found stack {stack_name} but resource not present {PhysicalResourceId} in account {self.account_id}"
+            )
             return(None)
 
         # Time to get the stack version
@@ -238,13 +231,14 @@ class AWSAccount(object):
         # Iterate down the outputs till we find the key TemplateVersion. That is our version
         output['template_version'] = False
         if 'Outputs' in stack:
-            for o in stack['Outputs']:
-                if o['OutputKey'] == VersionOutputKey:
-                    output['template_version'] = o['OutputValue']
-                    break
-            else:
-                output['template_version'] = "NotFound"
-
+            output['template_version'] = next(
+                (
+                    o['OutputValue']
+                    for o in stack['Outputs']
+                    if o['OutputKey'] == VersionOutputKey
+                ),
+                "NotFound",
+            )
         # Return the stackname and template_version
         return(output)
 
@@ -256,7 +250,7 @@ class AWSAccount(object):
         Update a specific attribute in a specific table for this account.
         key is the column, value is the new value to set
         """
-        logger.info(u"Adding key:{} value:{} to account {}".format(key, value, self))
+        logger.info(f"Adding key:{key} value:{value} to account {self}")
         try:
             response = self.account_table.update_item(
                 Key= {
@@ -271,13 +265,15 @@ class AWSAccount(object):
                 }
             )
         except ClientError as e:
-            raise AccountUpdateError("Failed to update {} to {} in account table: {}".format(key, value, e))
+            raise AccountUpdateError(
+                f"Failed to update {key} to {value} in account table: {e}"
+            )
 
     def get_attribute(self, key):
         """
         Fetches a attribute from the specificed table for the account
         """
-        logger.info(u"Getting key:{} from account_table for account {}".format(key, self))
+        logger.info(f"Getting key:{key} from account_table for account {self}")
         try:
             response = self.account_table.get_item(
                 Key= {
@@ -287,15 +283,19 @@ class AWSAccount(object):
             )
             return(response['Item'][key])
         except ClientError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
         except KeyError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
 
     def delete_attribute(self, key):
         """
         Delete a attribute from the specificed table for the account
         """
-        logger.info(u"Deleting key:{} from account table for account {}".format(key, self))
+        logger.info(f"Deleting key:{key} from account table for account {self}")
         table = self.account_table
         try:
             response = table.update_item(
@@ -311,9 +311,13 @@ class AWSAccount(object):
                 # }
             )
         except ClientError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
         except KeyError as e:
-            raise AccountLookupError("Failed to get {} from {} in account table: {}".format(key, self, e))
+            raise AccountLookupError(
+                f"Failed to get {key} from {self} in account table: {e}"
+            )
 
 
 class AntiopeAssumeRoleError(Exception):

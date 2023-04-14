@@ -34,9 +34,9 @@ class AzureSubscription(object):
             # Convert the response into instance attributes
             self.__dict__.update(item)
         except IndexError as e:
-            raise SubscriptionLookupError("ID {} not found".format(subscription_id))
+            raise SubscriptionLookupError(f"ID {subscription_id} not found")
         except Exception as e:
-            logger.error("Got Other error: {}".format(e))
+            logger.error(f"Got Other error: {e}")
 
     def __str__(self):
         """when converted to a string, become the subscription_id"""
@@ -44,7 +44,7 @@ class AzureSubscription(object):
 
     def __repr__(self):
         '''Create a useful string for this class if referenced'''
-        return("<Antiope.AzureSubscription {} >".format(self.subscription_id))
+        return f"<Antiope.AzureSubscription {self.subscription_id} >"
 
 
     #
@@ -55,7 +55,7 @@ class AzureSubscription(object):
         '''    update a specific attribute in a specific table for this subscription
             table_name should be a valid DynDB table, key is the column, value is the new value to set
         '''
-        logger.info(u"Adding key:{} value:{} to subscription {}".format(key, value, self))
+        logger.info(f"Adding key:{key} value:{value} to subscription {self}")
         table = self.dynamodb.Table(table_name)
         try:
             response = table.update_item(
@@ -71,13 +71,15 @@ class AzureSubscription(object):
                 }
             )
         except ClientError as e:
-            raise SubscriptionUpdateError("Failed to update {} to {} in {}: {}".format(key, value, table_name, e))
+            raise SubscriptionUpdateError(
+                f"Failed to update {key} to {value} in {table_name}: {e}"
+            )
 
     def get_attribute(self, table_name, key):
         '''
         Pulls a attribute from the specificed table for the subscription
         '''
-        logger.info(u"Getting key:{} from:{} for subscription {}".format(key, table_name, self))
+        logger.info(f"Getting key:{key} from:{table_name} for subscription {self}")
         table = self.dynamodb.Table(table_name)
         try:
             response = table.get_item(
@@ -88,15 +90,19 @@ class AzureSubscription(object):
             )
             return(response['Item'][key])
         except ClientError as e:
-            raise SubscriptionLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise SubscriptionLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
         except KeyError as e:
-            raise SubscriptionLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise SubscriptionLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
 
     def delete_attribute(self, table_name, key):
         '''
         Pulls a attribute from the specificed table for the subscription
         '''
-        logger.info(u"Deleting key:{} from:{} for subscription {}".format(key, table_name, self))
+        logger.info(f"Deleting key:{key} from:{table_name} for subscription {self}")
         table = self.dynamodb.Table(table_name)
         try:
             response = table.update_item(
@@ -112,9 +118,13 @@ class AzureSubscription(object):
                 # }
             )
         except ClientError as e:
-            raise SubscriptionLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise SubscriptionLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
         except KeyError as e:
-            raise SubscriptionLookupError("Failed to get {} from {} in {}: {}".format(key, table_name, self, e))
+            raise SubscriptionLookupError(
+                f"Failed to get {key} from {table_name} in {self}: {e}"
+            )
 
 
 class AssumeRoleError(Exception):

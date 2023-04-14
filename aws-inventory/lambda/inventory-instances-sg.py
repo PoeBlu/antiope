@@ -21,9 +21,9 @@ SG_RESOURCE_PATH = "ec2/securitygroup"
 
 
 def lambda_handler(event, context):
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     try:
         target_account = AWSAccount(message['account_id'])
@@ -40,13 +40,17 @@ def lambda_handler(event, context):
             process_securitygroups(target_account, ec2_client, r)
 
     except AntiopeAssumeRoleError as e:
-        logger.error("Unable to assume role into account {}({})".format(target_account.account_name, target_account.account_id))
+        logger.error(
+            f"Unable to assume role into account {target_account.account_name}({target_account.account_id})"
+        )
         return()
     except ClientError as e:
-        logger.critical("AWS Error getting info for {}: {}".format(target_account.account_name, e))
+        logger.critical(
+            f"AWS Error getting info for {target_account.account_name}: {e}"
+        )
         raise
     except Exception as e:
-        logger.critical("{}\nMessage: {}\nContext: {}".format(e, message, vars(context)))
+        logger.critical(f"{e}\nMessage: {message}\nContext: {vars(context)}")
         raise
 
 
@@ -54,18 +58,21 @@ def process_instances(target_account, ec2_client, region):
 
     instance_profiles = get_instance_profiles(ec2_client)
     instance_reservations = get_all_instances(ec2_client)
-    logger.info("Found {} instance reservations for {} in {}".format(len(instance_reservations), target_account.account_id, region))
+    logger.info(
+        f"Found {len(instance_reservations)} instance reservations for {target_account.account_id} in {region}"
+    )
 
     # dump info about instances to S3 as json
     for reservation in instance_reservations:
         for instance in reservation['Instances']:
 
-            resource_item = {}
-            resource_item['awsAccountId']                   = target_account.account_id
-            resource_item['awsAccountName']                 = target_account.account_name
-            resource_item['resourceType']                   = "AWS::EC2::Instance"
-            resource_item['source']                         = "Antiope"
-            resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+            resource_item = {
+                'awsAccountId': target_account.account_id,
+                'awsAccountName': target_account.account_name,
+                'resourceType': "AWS::EC2::Instance",
+                'source': "Antiope",
+                'configurationItemCaptureTime': str(datetime.datetime.now()),
+            }
             resource_item['awsRegion']                      = region
             resource_item['configuration']                  = instance
             if 'Tags' in instance:
@@ -84,17 +91,20 @@ def process_instances(target_account, ec2_client, region):
 def process_securitygroups(target_account, ec2_client, region):
 
     sec_groups = get_all_securitygroups(ec2_client)
-    logger.info("Found {} security groups for {} in {}".format(len(sec_groups), target_account.account_id, region))
+    logger.info(
+        f"Found {len(sec_groups)} security groups for {target_account.account_id} in {region}"
+    )
 
     # dump info about instances to S3 as json
     for sec_group in sec_groups:
 
-        resource_item = {}
-        resource_item['awsAccountId']                   = target_account.account_id
-        resource_item['awsAccountName']                 = target_account.account_name
-        resource_item['resourceType']                   = "AWS::EC2::SecurityGroup"
-        resource_item['source']                         = "Antiope"
-        resource_item['configurationItemCaptureTime']   = str(datetime.datetime.now())
+        resource_item = {
+            'awsAccountId': target_account.account_id,
+            'awsAccountName': target_account.account_name,
+            'resourceType': "AWS::EC2::SecurityGroup",
+            'source': "Antiope",
+            'configurationItemCaptureTime': str(datetime.datetime.now()),
+        }
         resource_item['awsRegion']                      = region
         resource_item['configuration']                  = sec_group
         if 'Tags' in sec_group:
@@ -113,10 +123,7 @@ def get_instance_profiles(ec2_client):
         response = ec2_client.describe_iam_instance_profile_associations(NextToken=response['NextToken'])
     assoc += response['IamInstanceProfileAssociations']
 
-    output = {}
-    for a in assoc:
-        output[a['InstanceId']] = a
-    return(output)
+    return {a['InstanceId']: a for a in assoc}
 
 
 def get_all_instances(ec2_client):

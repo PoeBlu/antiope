@@ -21,7 +21,7 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 
 # Lambda execution starts here
 def main(args, logger):
-    print("Recreating index {} in {}".format(args.index, args.domain))
+    print(f"Recreating index {args.index} in {args.domain}")
 
     host = get_endpoint(args.domain)
     if host is None:
@@ -89,11 +89,10 @@ def get_endpoint(domain):
     es_client = boto3.client('es')
 
     response = es_client.describe_elasticsearch_domain(DomainName=domain)
-    if 'DomainStatus' in response:
-        if 'Endpoint' in response['DomainStatus']:
-            return(response['DomainStatus']['Endpoint'])
+    if 'DomainStatus' in response and 'Endpoint' in response['DomainStatus']:
+        return(response['DomainStatus']['Endpoint'])
 
-    logger.error("Unable to get ES Endpoint for {}".format(domain))
+    logger.error(f"Unable to get ES Endpoint for {domain}")
     return(None)
 
 
@@ -111,9 +110,7 @@ def do_args():
     parser.add_argument("--region", help="AWS Region")
     parser.add_argument("--delete", help="Delete the index before recreating it", action='store_true')
 
-    args = parser.parse_args()
-
-    return(args)
+    return parser.parse_args()
 
 if __name__ == '__main__':
 
